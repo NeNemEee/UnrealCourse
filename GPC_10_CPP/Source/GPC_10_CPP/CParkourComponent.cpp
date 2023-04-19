@@ -6,6 +6,8 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Logger.h"
 
+
+
 UCParkourComponent::UCParkourComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -21,11 +23,28 @@ UCParkourComponent::UCParkourComponent()
 	Arrows[int32(EArrowType::Right)]->SetRelativeLocation(FVector(0, -30, 0));
 	Arrows[int32(EArrowType::Land)]->SetRelativeLocation(FVector(200, 0, 100));
 	Arrows[int32(EArrowType::Land)]->SetRelativeRotation(FRotator(-90, 0, 0));
+
+	
+
 }
+
+/*
+CallbackProxy
+- BlendingOutDelegate(UAnimMontage*, bool) (OnMontageBlendingOut 가 갖고있음<animinstance 의 OnMontageBlendingOut>)
+- OnMontageBlendingOut(UAnimMontage*, bool) {OnBlendOut.BroadCast(NAME_None);}(BlendingOutDelegate 가 갖고 있음)
+- OnBlendOut(FName)(OnMontageBlendingOut에게 호출당함)
+
+Animainstance			
+- OnMontageBlendingOut(UAnimMontage*, bool)
+
+UserFunction(FName){} (OnBlendOut 에 바인된 함수)
+*/
 
 void UCParkourComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	Cast<ACharacter>(GetOwner())->GetMesh()->GetAnimInstance()->OnMontageBlendingOut.AddDynamic(this, &ThisClass::EndParkour);
 
 	for (int32 i = 0; i < int32(EArrowType::Max); ++i)
 	{
@@ -93,7 +112,7 @@ void UCParkourComponent::BeginParkour()
 				{
 					float Dot = FVector::DotProduct(Results[int32(EArrowType::Center)].Normal, HitObtacle->GetActorForwardVector());
 
-					if (FMath::IsNearlyEqual(Dot, 0.1f) == true)
+					if (FMath::IsNearlyZero(Dot, 0.1f) == true)
 					{
 						for (int32 i = int32(EParkourType::Normal); i < int32(EParkourType::Max); ++i)
 						{
@@ -115,7 +134,7 @@ void UCParkourComponent::BeginParkour()
 	}
 }
 
-void UCParkourComponent::EndParkour()
+void UCParkourComponent::EndParkour(UAnimMontage* Montage, bool bInterrupted)
 {
 	switch (ParkourType)
 	{
@@ -164,6 +183,7 @@ void UCParkourComponent::TraceCenter()
 
 	if (Result.bBlockingHit == true && Result.Actor != nullptr)
 	{
+
 		typedef UStaticMeshComponent MeshType;
 
 		if (MeshType* Mesh = Cast<MeshType>(Result.Actor->GetComponentByClass(MeshType::StaticClass())))
@@ -382,10 +402,26 @@ void UCParkourComponent::BeginFall()
 
 void UCParkourComponent::BeginSlide()
 {
+	ParkourType = EParkourType::Slide;
+
+	TArray<FParkourData>& Data = DataMap[ParkourType];
+
+	Cast<ACharacter>(GetOwner())->PlayAnimMontage(Data[0].Montage, Data[0].PlayRate, Data[0].Section);
+
+	(Target = HitObtacle)->SetActorEnableCollision(false);
 }
 
 void UCParkourComponent::BeginOthers(EParkourType Type, FParkourData & Data)
 {
+	ParkourType = Type;
+
+	AActor* Owner = GetOwner();
+
+	Owner->SetActorRotation(FRotator(0, ToFrontYaw, 0));
+
+	Cast<ACharacter>(Owner)->PlayAnimMontage(Data.Montage, Data.PlayRate, Data.Section);
+
+	Owner->SetActorEnableCollision(false);
 }
 
 void UCParkourComponent::EndClimb()
@@ -399,8 +435,11 @@ void UCParkourComponent::EndFall()
 
 void UCParkourComponent::EndSlide()
 {
+	Target->SetActorEnableCollision(true);
+	Target = nullptr;
 }
 
 void UCParkourComponent::EndOthers()
 {
+	GetOwner()->SetActorEnableCollision(true);
 }

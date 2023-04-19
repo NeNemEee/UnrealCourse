@@ -74,7 +74,9 @@ public:
 
 public:
 	void BeginParkour();
-	void EndParkour();
+
+	UFUNCTION()
+		void EndParkour(UAnimMontage* Montage, bool bInterrupted);
 
 private:
 	void TraceArrow(EArrowType Type);
@@ -111,7 +113,7 @@ private:
 	FHitResult Results[int32(EArrowType::Max)];
 
 	float TraceDistance   = 500;
-	float AcceptableAngle = 30;
+	float AcceptableAngle = 45;
 
 	AActor* HitObtacle;
 	FVector HitObtacleExtent;
@@ -119,6 +121,8 @@ private:
 	float   ToFrontYaw;
 
 	bool bFalling;
+
+	class AActor* Target = nullptr;
 
 	EParkourType ParkourType = EParkourType::None;
 };
